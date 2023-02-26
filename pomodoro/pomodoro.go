@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -44,36 +45,43 @@ func promptDuration(label string) (time.Duration, error) {
 	inputStr = strings.TrimSpace(inputStr)
 	inputInt, err := strconv.Atoi(inputStr)
 	if err != nil {
-		return 0, fmt.Errorf("invalid input, please enter a number")
+		return 0, fmt.Errorf("that is an invalid number, please enter a number")
+	}
+	if inputInt <= 0 {
+		return 0, fmt.Errorf("that is an invalid number, please enter a positive integer")
 	}
 	return time.Duration(inputInt) * time.Minute, nil
 }
 
 // Prompt the user to enter loops
-func promptLoops(label string) (int, error) {
+func promptLoops() (int, error) {
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Printf("Enter the number of times you want to %v the pomodoro: ", label)
+	fmt.Print("Enter the number of times you want to loop through the pomodoro: ")
 	inputStr, _ := reader.ReadString('\n')
 	inputStr = strings.TrimSpace(inputStr)
 	inputInt, err := strconv.Atoi(inputStr)
 	if err != nil {
-		return 0, fmt.Errorf("hat is an invalid numer, please enter a valid number")
+		return 0, fmt.Errorf("that is an invalid number, please enter a valid number")
+	}
+
+	if inputInt <= 0 {
+		return 0, fmt.Errorf("that is an invalid number, please enter a positive integer")
 	}
 	return int(inputInt), nil
 }
 
-func runThepomodoro(loops int, pomodoro *Pomodoro) {
-	// Adding a progress bar
-	bar := progressbar.NewOptions(
-		100,
-		progressbar.OptionSetTheme(progressbar.Theme{Saucer: "📝", SaucerPadding: "", BarStart: "🏁", BarEnd: "🏁"}),
-		progressbar.OptionShowBytes(true),
-		progressbar.OptionEnableColorCodes(true),
-		progressbar.OptionSetRenderBlankState(true),
-	)
+// Core Pomodoro Function
+func runThePomodoro(loops int, pomodoro *Pomodoro) {
 	for i := 0; i < loops; i++ {
+		fmt.Printf("\nThis is study round: %v\n", i+1)
 		// Start the Pomodoro timer
 		pomodoro.Start()
+
+		// Adding a progress bar
+		bar := progressbar.DefaultBytes(
+			int64(pomodoro.Duration.Seconds()),
+			"pomodoro progress",
+		)
 
 		// Wait for the Pomodoro timer to end
 		for pomodoro.Running {
@@ -96,32 +104,36 @@ func runThepomodoro(loops int, pomodoro *Pomodoro) {
 		// Reset the progress bar for the break
 		bar.Reset()
 
+		// Adding a progress bar for the break
+		breakBar := progressbar.DefaultBytes(
+			int64(pomodoro.BreakDuration.Seconds()),
+			"break progress",
+		)
+
 		// Update the progress bar for the break
-		bar.ChangeMax64(int64(pomodoro.BreakDuration.Seconds()))
-		// bar.Set64(int64(pomodoro.BreakDuration.Seconds()))
-		time.Sleep(pomodoro.BreakDuration)
+		breakBar.Set64(int64(pomodoro.BreakDuration.Seconds()))
 	}
 }
 
-func main() {
+func doTheWholePomodoro() {
 	// Introducing the pomodoro app in the cli
 	fmt.Println("Welcome to the Pomodoro app!")
 
 	// Prompt the user to enter the duration and break duration of the Pomodoro timer
 	duration, err := promptDuration("Pomodoro duration")
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
-	breakDuration, err := promptDuration("break duration")
+	breakDuration, err := promptDuration("Break duration")
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 
-	loops, err := promptLoops("loop through")
+	loops, err := promptLoops()
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
 		return
 	}
 
@@ -134,9 +146,31 @@ func main() {
 		EndTime:       time.Time{},
 	}
 
-	runThepomodoro(loops, &pomodoro)
+	runThePomodoro(loops, &pomodoro)
 
-	fmt.Printf("The pomodoro app did %v loops. I hope you studied well!\n", loops)
+	fmt.Printf("\nThe pomodoro app did %v loops. I hope you studied well!\n", loops)
+}
+
+func main() {
+	// Starts the pomodoro timer and prompts the user to start another pomodoro, with input validation for "y" or "n".
+	for {
+		doTheWholePomodoro()
+
+		fmt.Print("Do you want to do the pomodoro again? (y/n): ")
+		reader := bufio.NewReader(os.Stdin)
+		answer, _ := reader.ReadString('\n')
+		answer = strings.ToLower(strings.TrimSpace(answer))
+		if answer == "y" {
+			fmt.Println("Continuing...")
+			break
+		} else if answer == "n" {
+			fmt.Println("Exiting...")
+			break
+		} else {
+			fmt.Println("Invalid input. Please enter 'y' or 'n'.")
+		}
+	}
+
 	fmt.Println("Goodbye!")
 	os.Exit(0)
 
